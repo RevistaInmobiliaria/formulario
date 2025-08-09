@@ -248,6 +248,50 @@
         <label for="paginaWeb">Página Web</label>
         <input type="url" id="paginaWeb" placeholder="https://www.ejemplo.com" />
     </div>
+
+    <div style="grid-column: 1 / -1;">
+        <label for="color1">Color corporativo 1:</label>
+        <select id="color1" required>
+            <option value="">-- Selecciona un color --</option>
+            <option value="#000000">Negro</option>
+            <option value="#FFFFFF">Blanco</option>
+            <option value="#FF0000">Rojo</option>
+            <option value="#0000FF">Azul</option>
+            <option value="#008000">Verde</option>
+            <option value="#FFFF00">Amarillo</option>
+            <option value="#FFA500">Naranja</option>
+            <option value="#800080">Morado</option>
+            <option value="#808080">Gris</option>
+            <option value="#00FFFF">Cian</option>
+            <option value="#FFC0CB">Rosa</option>
+            <option value="#A52A2A">Marrón</option>
+            <option value="#FFD700">Dorado</option>
+            <option value="#00FF00">Verde Lima</option>
+            <option value="#4B0082">Índigo</option>
+        </select>
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="color2">Color corporativo 2:</label>
+        <select id="color2" required>
+            <option value="">-- Selecciona un color --</option>
+            <option value="#000000">Negro</option>
+            <option value="#FFFFFF">Blanco</option>
+            <option value="#FF0000">Rojo</option>
+            <option value="#0000FF">Azul</option>
+            <option value="#008000">Verde</option>
+            <option value="#FFFF00">Amarillo</option>
+            <option value="#FFA500">Naranja</option>
+            <option value="#800080">Morado</option>
+            <option value="#808080">Gris</option>
+            <option value="#00FFFF">Cian</option>
+            <option value="#FFC0CB">Rosa</option>
+            <option value="#A52A2A">Marrón</option>
+            <option value="#FFD700">Dorado</option>
+            <option value="#00FF00">Verde Lima</option>
+            <option value="#4B0082">Índigo</option>
+        </select>
+    </div>
+
 </form>
 
 <div class="grid" id="editor">
@@ -264,7 +308,17 @@
 <button id="sendBtn">ENVIAR</button>
 
 <script>
-const GOOGLE_SHEET_WEBAPP_URL = "PON_AQUI_TU_URL_EXEC"; // Cambia esto
+const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwbTJ3DfjPkDxJK5UbFA1hACGfP1Yasc-0dmz2Bislt88dUBCxbAMhPPFSHQ1TGgBk/exec"; // Cambia esto
+
+// Función para convertir imagen a Base64
+function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 
 // Previsualización logotipo
 document.getElementById('logo').addEventListener('change', function() {
@@ -403,6 +457,7 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     }
 
     // Preparar datos para enviar
+    // Preparar datos para enviar
     const formData = {
         header: {
             nombreInmobiliaria: nombreInmobiliaria.value.trim(),
@@ -412,19 +467,38 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
             telefono: document.getElementById('telefono').value.trim(),
             direccion: document.getElementById('direccion').value.trim(),
             eslogan: document.getElementById('eslogan').value.trim(),
-            paginaWeb: document.getElementById('paginaWeb').value.trim()
+            paginaWeb: document.getElementById('paginaWeb').value.trim(),
+            logoBase64: null,
         },
         inmuebles: []
     };
 
+    // AÑADIR LOS COLORES CORPORATIVOS A LA CABECERA
+    formData.header.color1 = document.getElementById('color1').value;
+    formData.header.color2 = document.getElementById('color2').value;
+
+
+    // Convertir logo a base64 si hay archivo
+    const logoInput = document.getElementById('logo');
+    if (logoInput.files.length > 0) {
+        formData.header.logoBase64 = await toBase64(logoInput.files[0]);
+    }
+
     // Recoger datos de inmuebles
     for (let i = 1; i <= 12; i++) {
+        const imgInput = document.getElementById(`img${i}`);
+        let imgBase64 = null;
+        if (imgInput.files.length > 0) {
+            imgBase64 = await toBase64(imgInput.files[0]);
+        }
         const title = document.getElementById(`title${i}`).value.trim();
         const loc = document.getElementById(`loc${i}`).value.trim();
         const desc = document.getElementById(`desc${i}`).value.trim();
         const price = document.getElementById(`price${i}`).value.trim();
         const energy = document.getElementById(`energy${i}`).value;
         const saleTypeElems = document.getElementsByName(`saleType${i}`);
+        const color1 = document.getElementById('color1').value;
+        const color2 = document.getElementById('color2').value;
         let saleType = "";
         for (const radio of saleTypeElems) {
             if (radio.checked) {
@@ -433,6 +507,7 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
             }
         }
         formData.inmuebles.push({
+            imgBase64,
             title,
             loc,
             desc,
@@ -442,34 +517,15 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
         });
     }
 
-    // Crear FormData para enviar archivos
-    const filesFormData = new FormData();
-    
-    // Agregar logo si existe
-    const logoInput = document.getElementById('logo');
-    if (logoInput.files.length > 0) {
-        filesFormData.append('logo', logoInput.files[0]);
-    }
-    
-    // Agregar imágenes de inmuebles
-    for (let i = 1; i <= 12; i++) {
-        const imgInput = document.getElementById(`img${i}`);
-        if (imgInput.files.length > 0) {
-            filesFormData.append(`img${i}`, imgInput.files[0]);
-        }
-    }
-    
-    // Agregar datos JSON como string
-    filesFormData.append('data', JSON.stringify(formData));
-
     // Enviar datos por fetch
     try {
         const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
             method: "POST",
-            body: filesFormData
-            // No establecer Content-Type (se establece automáticamente con FormData)
+            body: JSON.stringify(formData),
+            headers: {
+                "Content-Type": "application/json"
+            }
         });
-        
         const result = await response.json();
         if (result.success) {
             alert("Datos enviados correctamente.");
