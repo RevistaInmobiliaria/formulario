@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Editor Revista Inmobiliaria</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #dedede;
+    }
+    h1 {
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    #note {
+        text-align: center;
+        font-size: 14px;
+        color: #555;
+        margin-bottom: 25px;
+        font-style: italic;
+    }
+    form#headerForm {
+        background: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        max-width: 900px;
+        margin: 0 auto 30px auto;
+        font-size: 14px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+        gap: 15px 20px;
+        align-items: center;
+    }
+    form#headerForm label {
+        font-weight: 600;
+        display: block;
+        margin-bottom: 4px;
+    }
+    form#headerForm input[type="text"],
+    form#headerForm input[type="email"],
+    form#headerForm input[type="tel"],
+    form#headerForm input[type="file"],
+    form#headerForm input[type="url"] {
+        width: 100%;
+        padding: 6px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+    #logoPreview {
+        max-width: 150px;
+        max-height: 100px;
+        object-fit: contain;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        margin-top: 6px;
+        display: block;
+    }
+    .required::after {
+        content: " *";
+        color: red;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+    .card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        font-size: 14px;
+    }
+    .preview {
+        background: #fafafa;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .preview img {
+        max-width: 100%;
+        height: 160px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    .preview h3 {
+        font-size: 16px;
+        margin: 8px 0 4px;
+    }
+    .preview p {
+        margin: 2px 0;
+        font-size: 14px;
+    }
+    .card input[type="text"],
+    .card input[type="number"],
+    .card textarea,
+    .card select {
+        width: 100%;
+        margin-bottom: 2px;
+        padding: 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+    textarea {
+        resize: vertical;
+        height: 50px;
+    }
+    .desc-counter {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 8px;
+        text-align: right;
+    }
+    .radio-group {
+        margin: 10px 0 8px;
+        display: flex;
+        justify-content: space-between;
+        gap: 5px;
+    }
+    .radio-group label {
+        flex: 1;
+        font-size: 13px;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .radio-group input[type="radio"] {
+        margin: 0;
+    }
+    #sendBtn {
+        display: block;
+        margin: 20px auto 0;
+        padding: 12px 25px;
+        font-size: 18px;
+        background: #ffa300;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    #sendBtn:hover {
+        background: #ff830b;
+    }
+    .error {
+        border-color: red !important;
+        background-color: #ffe6e6;
+    }
+    .inmueble-num {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 6px;
+    }
+    #confirmCheckContainer {
+        max-width: 900px;
+        margin: 0 auto 30px auto;
+        font-size: 14px;
+        background: white;
+        padding: 12px 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    #confirmCheckContainer label {
+        user-select: none;
+    }
+    @media (max-width: 900px) {
+        .grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        form#headerForm {
+            grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+        }
+        #confirmCheckContainer {
+            padding: 10px;
+        }
+    }
+    @media (max-width: 600px) {
+        .grid {
+            grid-template-columns: 1fr;
+        }
+        form#headerForm {
+            grid-template-columns: 1fr;
+        }
+        #confirmCheckContainer {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<h1>Envíanos Tú Revista Inmobiliaria <br>(12 Inmuebles)</h1>
+<div id="note">Nota: Los campos vacíos usarán los datos que se proporcionaron el mes anterior.</div>
+
+<form id="headerForm" novalidate>
+    <div>
+        <label for="nombreInmobiliaria" class="required">Nombre Inmobiliaria</label>
+        <input type="text" id="nombreInmobiliaria" required />
+    </div>
+    <div>
+        <label for="razonSocial" class="required">Razón Social</label>
+        <input type="text" id="razonSocial" required />
+    </div>
+    <div>
+        <label for="cif" class="required">CIF</label>
+        <input type="text" id="cif" required />
+    </div>
+    <div>
+        <label for="email">Email</label>
+        <input type="email" id="email" />
+    </div>
+    <div>
+        <label for="telefono">Teléfono</label>
+        <input type="tel" id="telefono" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="direccion">Dirección de la oficina</label>
+        <input type="text" id="direccion" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="logo">Cargar Logotipo</label>
+        <input type="file" id="logo" accept="image/*" />
+        <img id="logoPreview" alt="Previsualización logotipo" src="" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="eslogan">Eslogan</label>
+        <input type="text" id="eslogan" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="paginaWeb">Página Web</label>
+        <input type="url" id="paginaWeb" placeholder="https://www.ejemplo.com" />
+    </div>
+
+    <div style="grid-column: 1 / -1;">
+        <label for="color1">Color corporativo 1:</label>
+        <select id="color1" required>
+            <option value="">-- Selecciona un color --</option>
+            <option value="#000000">Negro</option>
+            <option value="#FFFFFF">Blanco</option>
+            <option value="#FF0000">Rojo</option>
+            <option value="#0000FF">Azul</option>
+            <option value="#008000">Verde</option>
+            <option value="#FFFF00">Amarillo</option>
+            <option value="#FFA500">Naranja</option>
+            <option value="#800080">Morado</option>
+            <option value="#808080">Gris</option>
+            <option value="#00FFFF">Cian</option>
+            <option value="#FFC0CB">Rosa</option>
+            <option value="#A52A2A">Marrón</option>
+            <option value="#FFD700">Dorado</option>
+            <option value="#00FF00">Verde Lima</option>
+            <option value="#4B0082">Índigo</option>
+        </select>
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="color2">Color corporativo 2:</label>
+        <select id="color2" required>
+            <option value="">-- Selecciona un color --</option>
+            <option value="#000000">Negro</option>
+            <option value="#FFFFFF">Blanco</option>
+            <option value="#FF0000">Rojo</option>
+            <option value="#0000FF">Azul</option>
+            <option value="#008000">Verde</option>
+            <option value="#FFFF00">Amarillo</option>
+            <option value="#FFA500">Naranja</option>
+            <option value="#800080">Morado</option>
+            <option value="#808080">Gris</option>
+            <option value="#00FFFF">Cian</option>
+            <option value="#FFC0CB">Rosa</option>
+            <option value="#A52A2A">Marrón</option>
+            <option value="#FFD700">Dorado</option>
+            <option value="#00FF00">Verde Lima</option>
+            <option value="#4B0082">Índigo</option>
+        </select>
+    </div>
+
+</form>
+
+<div class="grid" id="editor">
+    <!-- Cards generadas por JS -->
+</div>
+<br>
+<div id="confirmCheckContainer">
+    <input type="checkbox" id="confirmCheck" />
+    <label for="confirmCheck">
+        Confirmo que he finalizado la edición y los datos de los inmuebles están correctos, los datos no enviados, se completarán con los datos ya existentes de la edición anterior
+    </label>
+</div>
+
+<button id="sendBtn">ENVIAR</button>
+
+<script>
+const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxSeTHDfL1RsS2fhivhu5U7k4AFXqjewzJfKwHF_NJ97P3BZIhzZxJddHX62gZdGLa3Hg/exec"; // Cambia esto
+
+// Función para convertir imagen a Base64
+function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// Previsualización logotipo
+document.getElementById('logo').addEventListener('change', function() {
+    const file = this.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('logoPreview').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        document.getElementById('logoPreview').src = "";
+    }
+});
+
+const container = document.getElementById('editor');
+for (let i = 1; i <= 12; i++) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+        <div class="inmueble-num">Inmueble ${i}</div>
+        <div class="preview" id="preview${i}">
+            <img src="" alt="Vista previa" id="imgPreview${i}">
+            <h3 id="titlePreview${i}">Título</h3>
+            <p id="locPreview${i}">Localidad</p>
+            <p id="descPreview${i}">Descripción</p>
+            <p id="pricePreview${i}">Precio</p>
+            <p id="energyPreview${i}">Etiqueta</p>
+            <p id="saleTypePreview${i}">Tipo de operación</p>
+        </div>
+        <input type="file" accept="image/*" id="img${i}">
+        <input type="text" placeholder="Título" id="title${i}">
+        <input type="text" placeholder="Localidad" id="loc${i}">
+        <textarea maxlength="175" placeholder="Descripción (máx 175 caracteres)" id="desc${i}"></textarea>
+        <div class="desc-counter" id="descCount${i}">0/175</div>
+        <input type="number" placeholder="Precio" id="price${i}">
+        <select id="energy${i}">
+            <option value="">Etiqueta energética</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+            <option value="G">G</option>
+        </select>
+        <div class="radio-group">
+            <label><input type="radio" name="saleType${i}" value="Venta"> Venta</label>
+            <label><input type="radio" name="saleType${i}" value="Alquiler"> Alquiler</label>
+            <label><input type="radio" name="saleType${i}" value="Alquiler con opción a compra"> Alquiler con opción a compra</label>
+        </div>
+    `;
+    container.appendChild(card);
+
+    // Actualizar contador caracteres descripción
+    const descTextarea = card.querySelector(`#desc${i}`);
+    const descCounter = card.querySelector(`#descCount${i}`);
+    descTextarea.addEventListener('input', () => {
+        descCounter.textContent = `${descTextarea.value.length}/175`;
+        updatePreview(i);
+    });
+
+    // Actualizar preview para otros inputs
+    ['title', 'loc', 'price', 'energy'].forEach(field => {
+        card.querySelector(`#${field}${i}`).addEventListener('input', () => updatePreview(i));
+    });
+    // Radio buttons
+    card.querySelectorAll(`input[name="saleType${i}"]`).forEach(radio => {
+        radio.addEventListener('change', () => updatePreview(i));
+    });
+    // Imagen preview
+    card.querySelector(`#img${i}`).addEventListener('change', function () {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById(`imgPreview${i}`).src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            document.getElementById(`imgPreview${i}`).src = "";
+        }
+    });
+}
+
+// Función para actualizar la vista previa del inmueble i
+function updatePreview(i) {
+    const title = document.getElementById(`title${i}`).value.trim();
+    const loc = document.getElementById(`loc${i}`).value.trim();
+    const desc = document.getElementById(`desc${i}`).value.trim();
+    const price = document.getElementById(`price${i}`).value.trim();
+    const energy = document.getElementById(`energy${i}`).value;
+    const saleTypeElems = document.getElementsByName(`saleType${i}`);
+    let saleType = "";
+    for (const radio of saleTypeElems) {
+        if (radio.checked) {
+            saleType = radio.value;
+            break;
+        }
+    }
+
+    document.getElementById(`titlePreview${i}`).textContent = title || "Título";
+    document.getElementById(`locPreview${i}`).textContent = loc || "Localidad";
+    document.getElementById(`descPreview${i}`).textContent = desc || "Descripción";
+    document.getElementById(`pricePreview${i}`).textContent = price ? price + " €" : "Precio";
+    document.getElementById(`energyPreview${i}`).textContent = energy ? "Etiqueta: " + energy : "Etiqueta energética";
+    document.getElementById(`saleTypePreview${i}`).textContent = saleType || "Tipo de operación";
+}
+
+// Botón enviar y validación
+document.getElementById('sendBtn').addEventListener('click', async () => {
+    // Validación del checkbox obligatorio
+    const confirmCheck = document.getElementById('confirmCheck');
+    if (!confirmCheck.checked) {
+        alert("Debes confirmar que has finalizado la edición y que los datos son correctos.");
+        return;
+    }
+
+    // Validar campos obligatorios header
+    const nombreInmobiliaria = document.getElementById('nombreInmobiliaria');
+    const razonSocial = document.getElementById('razonSocial');
+    const cif = document.getElementById('cif');
+
+    let valid = true;
+    [nombreInmobiliaria, razonSocial, cif].forEach(input => {
+        if (!input.value.trim()) {
+            input.classList.add('error');
+            valid = false;
+        } else {
+            input.classList.remove('error');
+        }
+    });
+    if (!valid) {
+        alert("Por favor, completa los campos obligatorios marcados.");
+        return;
+    }
+
+    // Preparar datos para enviar
+    // Preparar datos para enviar
+    const formData = {
+        header: {
+            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
+            razonSocial: razonSocial.value.trim(),
+            cif: cif.value.trim(),
+            email: document.getElementById('email').value.trim(),
+            telefono: document.getElementById('telefono').value.trim(),
+            direccion: document.getElementById('direccion').value.trim(),
+            eslogan: document.getElementById('eslogan').value.trim(),
+            paginaWeb: document.getElementById('paginaWeb').value.trim(),
+            logoBase64: null,
+        },
+        inmuebles: []
+    };
+
+    // AÑADIR LOS COLORES CORPORATIVOS A LA CABECERA
+    formData.header.color1 = document.getElementById('color1').value;
+    formData.header.color2 = document.getElementById('color2').value;
+
+
+    // Convertir logo a base64 si hay archivo
+    const logoInput = document.getElementById('logo');
+    if (logoInput.files.length > 0) {
+        formData.header.logoBase64 = await toBase64(logoInput.files[0]);
+    }
+
+    // Recoger datos de inmuebles
+    for (let i = 1; i <= 12; i++) {
+        const imgInput = document.getElementById(`img${i}`);
+        let imgBase64 = null;
+        if (imgInput.files.length > 0) {
+            imgBase64 = await toBase64(imgInput.files[0]);
+        }
+        const title = document.getElementById(`title${i}`).value.trim();
+        const loc = document.getElementById(`loc${i}`).value.trim();
+        const desc = document.getElementById(`desc${i}`).value.trim();
+        const price = document.getElementById(`price${i}`).value.trim();
+        const energy = document.getElementById(`energy${i}`).value;
+        const saleTypeElems = document.getElementsByName(`saleType${i}`);
+        const color1 = document.getElementById('color1').value;
+        const color2 = document.getElementById('color2').value;
+        let saleType = "";
+        for (const radio of saleTypeElems) {
+            if (radio.checked) {
+                saleType = radio.value;
+                break;
+            }
+        }
+        formData.inmuebles.push({
+            imgBase64,
+            title,
+            loc,
+            desc,
+            price,
+            energy,
+            saleType
+        });
+    }
+
+    // Enviar datos por fetch
+    try {
+        const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+            method: "POST",
+            body: JSON.stringify(formData),
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert("Datos enviados correctamente.");
+            // Opcional: resetear formulario o recargar página
+        } else {
+            alert("Error al enviar los datos: " + (result.message || "Error desconocido"));
+        }
+    } catch (error) {
+        alert("Error en la conexión: " + error.message);
+    }
+});
+</script>
+
+</body>
+</html>
