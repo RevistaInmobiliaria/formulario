@@ -1,208 +1,516 @@
+Conversation opened. 1 read message.
+
+Skip to content
+Using Gmail with screen readers
+Enable desktop notifications for Gmail.
+   OK  No thanks
+9 of 43
+Html con Google drive
+Inbox
+
+Revista Inmobiliaria <revistainmobiliaria25@gmail.com>
+Attachments
+Sat, Aug 9, 11:38 PM (2 hours ago)
+to me
+
+Aquí tienes el código completo de Google Apps Script para manejar las imágenes y guardar los datos en Google Sheets:
+
+```javascript
+const SPREADSHEET_ID = "TU_ID_DE_HOJA_DE_CÁLCULO";
+const SHEET_NAME = "Datos";
+
+function doPost(e) {
+  try {
+    // Parsear los datos multipart
+    const boundary = e.postData.type.split('boundary=')[1];
+    const parts = e.postData.contents.split('--' + boundary);
+    const files = {};
+    let jsonData = null;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const contentDisposition = part.match(/Content-Disposition: form-data; name="([^"]+)"/);
+      if (contentDisposition) {
+        const name = contentDisposition[1];
+        const valueStart = part.indexOf('\r\n\r\n') + 4;
+        let value = part.slice(valueStart, part.indexOf('\r\n--'));
+        
+        if (name === 'data') {
+          jsonData = JSON.parse(value);
+        } else {
+          // Procesar archivos
+          const contentTypeMatch = part.match(/Content-Type: ([^\r\n]+)/);
+          if (contentTypeMatch) {
+            const contentType = contentTypeMatch[1];
+            const filenameMatch = part.match(/filename="([^"]+)"/);
+            const filename = filenameMatch ? filenameMatch[1] : name + '.jpg';
+            files[name] = {
+              contentType: contentType,
+              data: value,
+              filename: filename
+            };
+          }
+        }
+      }
+    }
+
+    if (!jsonData || !jsonData.header || !jsonData.header.cif) {
+      throw new Error("Datos incompletos o CIF no proporcionado");
+    }
+
+    const cif = jsonData.header.cif;
+    const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const folderName = `${cif}_${fecha}`;
+    
+    // Crear o encontrar carpeta en Drive
+    let folder;
+    const existingFolders = DriveApp.getFoldersByName(folderName);
+    if (existingFolders.hasNext()) {
+      folder = existingFolders.next();
+    } else {
+      folder = DriveApp.createFolder(folderName);
+    }
+
+    const headerData = jsonData.header;
+    const inmueblesData = jsonData.inmuebles;
+
+    // Procesar logo
+    if (files.logo) {
+      const logoFile = files.logo;
+      const logoBlob = Utilities.newBlob(
+        Utilities.base64Decode(logoFile.data.split('base64,')[1]),
+        logoFile.contentType,
+        logoFile.filename
+      );
+      const driveFile = folder.createFile(logoBlob);
+      headerData.logoUrl = driveFile.getUrl();
+    } else {
+      headerData.logoUrl = "";
+    }
+
+    // Procesar imágenes de inmuebles
+    for (let i = 1; i <= 12; i++) {
+      const fileKey = `img${i}`;
+      const inmuebleIndex = i - 1;
+      
+      if (files[fileKey]) {
+        const imgFile = files[fileKey];
+        const imgBlob = Utilities.newBlob(
+          Utilities.base64Decode(imgFile.data.split('base64,')[1]),
+          imgFile.contentType,
+          `inmueble_${i}.jpg`
+        );
+        const driveFile = folder.createFile(imgBlob);
+        inmueblesData[inmuebleIndex].imgUrl = driveFile.getUrl();
+      } else {
+        if (!inmueblesData[inmuebleIndex]) inmueblesData[inmuebleIndex] = {};
+        inmueblesData[inmuebleIndex].imgUrl = "";
+      }
+    }
+
+    // Guardar en Google Sheets
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    const values = sheet.getDataRange().getValues();
+    const headers = values[0];
+    
+    // Buscar fila existente por CIF
+    const cifIndex = headers.indexOf("CIF");
+    let rowIndex = -1;
+    
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][cifIndex] === headerData.cif) {
+        rowIndex = i + 1; // +1 porque las filas en Sheets empiezan en 1
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      // Crear nueva fila
+      createNewRow(sheet, headers, headerData, inmueblesData);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: "Nueva inmobiliaria creada con éxito"
+      })).setMimeType(ContentService.MimeType.JSON);
+    } else {
+      // Actualizar fila existente
+      updateExistingRow(sheet, headers, headerData, inmueblesData, rowIndex);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: "Datos actualizados con éxito"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+  } catch (error) {
+    console.error("Error: " + error.message);
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      message: error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function createNewRow(sheet, headers, headerData, inmueblesData) {
+  const newRow = headers.map(header => {
+    // Datos de la inmobiliaria
+    if (header in headerData) {
+      return headerData[header] || "";
+    }
+    
+    // Datos de inmuebles
+    const match = header.match(/Inmueble (\d+) (.*)/);
+    if (match) {
+      const inmuebleNum = parseInt(match[1]);
+      const fieldName = match[2];
+      const inmueble = inmueblesData[inmuebleNum - 1] || {};
+      
+      switch(fieldName) {
+        case "Imagen": return inmueble.imgUrl || "";
+        case "Título": return inmueble.title || "";
+        case "Localidad": return inmueble.loc || "";
+        case "Descripción": return inmueble.desc || "";
+        case "Precio": return inmueble.price || "";
+        case "Etiqueta": return inmueble.energy || "";
+        case "Tipo": return inmueble.saleType || "";
+        default: return "";
+      }
+    }
+    
+    // Fecha de creación
+    if (header === "Fecha de Creación") {
+      return new Date();
+    }
+    
+    return "";
+  });
+  
+  sheet.appendRow(newRow);
+}
+
+function updateExistingRow(sheet, headers, headerData, inmueblesData, rowIndex) {
+  const rowRange = sheet.getRange(rowIndex, 1, 1, headers.length);
+  const rowValues = rowRange.getValues()[0];
+  let updated = false;
+  
+  // Actualizar datos de la inmobiliaria (solo campos no vacíos)
+  for (const [key, value] of Object.entries(headerData)) {
+    const col = headers.indexOf(key);
+    if (col !== -1 && value && value !== "") {
+      if (rowValues[col] !== value) {
+        rowValues[col] = value;
+        updated = true;
+      }
+    }
+  }
+  
+  // Actualizar datos de inmuebles (solo campos no vacíos)
+  for (let i = 0; i < 12; i++) {
+    const inmueble = inmueblesData[i] || {};
+    const prefix = `Inmueble ${i + 1} `;
+    
+    const fields = [
+      {header: prefix + "Imagen", value: inmueble.imgUrl},
+      {header: prefix + "Título", value: inmueble.title},
+      {header: prefix + "Localidad", value: inmueble.loc},
+      {header: prefix + "Descripción", value: inmueble.desc},
+      {header: prefix + "Precio", value: inmueble.price},
+      {header: prefix + "Etiqueta", value: inmueble.energy},
+      {header: prefix + "Tipo", value: inmueble.saleType}
+    ];
+    
+    for (const field of fields) {
+      const col = headers.indexOf(field.header);
+      if (col !== -1 && field.value && field.value !== "") {
+        if (rowValues[col] !== field.value) {
+          rowValues[col] = field.value;
+          updated = true;
+        }
+      }
+    }
+  }
+  
+  // Actualizar fecha de modificación si hubo cambios
+  if (updated) {
+    const dateCol = headers.indexOf("Última Actualización");
+    if (dateCol !== -1) {
+      rowValues[dateCol] = new Date();
+    }
+    rowRange.setValues([rowValues]);
+  }
+}
+
+// Función auxiliar para desarrollo
+function doGet() {
+  return HtmlService.createHtmlOutput("<b>Servicio activo para recibir datos POST</b>");
+}
+```
+
+### Instrucciones de implementación:
+
+1. **Configuración de la hoja de cálculo:**
+   - Crea una hoja de cálculo con el nombre "Datos"
+   - Configura las columnas en este orden:
+     ```plaintext
+     Nombre Inmobiliaria, Razón Social, CIF, Email, Teléfono, Dirección, Eslogan, Página Web, Logo, Fecha de Creación, Última Actualización,
+     Inmueble 1 Imagen, Inmueble 1 Título, Inmueble 1 Localidad, Inmueble 1 Descripción, Inmueble 1 Precio, Inmueble 1 Etiqueta, Inmueble 1 Tipo,
+     Inmueble 2 Imagen, Inmueble 2 Título, ... (repetir para los 12 inmuebles)
+     ```
+
+2. **Configura el script:**
+   - Reemplaza `TU_ID_DE_HOJA_DE_CÁLCULO` con el ID de tu hoja de cálculo
+   - Configura los permisos necesarios:
+     - `https://www.googleapis.com/auth/spreadsheets`
+     - `https://www.googleapis.com/auth/drive`
+
+3. **Despliegue:**
+   - Publica como aplicación web
+   - Ejecutar como: "Yo mismo"
+   - Acceso: "Todos, incluso anónimos"
+   - Copia la URL de despliegue
+
+4. **Configura el HTML:**
+   - En tu archivo HTML, reemplaza:
+     ```javascript
+     const GOOGLE_SHEET_WEBAPP_URL = "PON_AQUI_TU_URL_EXEC";
+     ```
+     con la URL de tu aplicación web
+
+### Características clave:
+
+1. **Manejo de imágenes:**
+   - Crea carpetas en Drive con formato `CIF_FECHA` (ej: `B12345678_20230810`)
+   - Guarda el logo como `logo.jpg` (si se proporciona)
+   - Guarda imágenes de inmuebles como `inmueble_1.jpg`, `inmueble_2.jpg`, etc.
+   - Almacena las URLs de Drive en la hoja de cálculo
+
+2. **Actualización inteligente:**
+   - Campos vacíos no sobrescriben datos existentes
+   - Solo actualiza campos con nuevos valores no vacíos
+   - Mantiene valores anteriores cuando no se envían datos
+
+3. **Registro de actividad:**
+   - `Fecha de Creación`: cuando se crea un nuevo registro
+   - `Última Actualización`: cuando se modifican datos existentes
+
+4. **Manejo de errores:**
+   - Validación de datos básica
+   - Respuestas JSON estructuradas
+   - Registro de errores en la consola
+
+5. **Estructura de datos:**
+   - Toda la información en una sola fila por inmobiliaria
+   - 9 campos de información general
+   - 7 campos por inmueble × 12 inmuebles = 84 campos
+   - Total: 93 columnas por fila
+
+Este código está optimizado para manejar el formulario HTML que proporcionaste, procesando tanto los datos estructurados como los archivos adjuntos, y guardando todo en una sola fila en Google Sheets según tus requerimientos.
+ One attachment
+  •  Scanned by Gmail
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
 <title>Editor Revista Inmobiliaria</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 20px;
-        background: #dedede;
-    }
-    h1 {
-        text-align: center;
-        margin-bottom: 5px;
-    }
-    #note {
-        text-align: center;
-        font-size: 14px;
-        color: #555;
-        margin-bottom: 25px;
-        font-style: italic;
-    }
-    form#headerForm {
-        background: white;
-        padding: 15px 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        max-width: 900px;
-        margin: 0 auto 30px auto;
-        font-size: 14px;
-        display: grid;
-        grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-        gap: 15px 20px;
-        align-items: center;
-    }
-    form#headerForm label {
-        font-weight: 600;
-        display: block;
-        margin-bottom: 4px;
-    }
-    form#headerForm input[type="text"],
-    form#headerForm input[type="email"],
-    form#headerForm input[type="tel"],
-    form#headerForm input[type="file"],
-    form#headerForm input[type="url"] {
-        width: 100%;
-        padding: 6px;
-        border-radius: 4px;
-        border: 1px solid #ccc;
-        font-size: 14px;
-        box-sizing: border-box;
-    }
-    #logoPreview {
-        max-width: 150px;
-        max-height: 100px;
-        object-fit: contain;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        margin-top: 6px;
-        display: block;
-    }
-    .required::after {
-        content: " *";
-        color: red;
-    }
-    .grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-    }
-    .card {
-        background: white;
-        border-radius: 10px;
-        padding: 15px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        font-size: 14px;
-    }
-    .preview {
-        background: #fafafa;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        padding: 10px;
-        text-align: center;
-        margin-bottom: 10px;
-    }
-    .preview img {
-        max-width: 100%;
-        height: 160px;
-        object-fit: cover;
-        border-radius: 4px;
-    }
-    .preview h3 {
-        font-size: 16px;
-        margin: 8px 0 4px;
-    }
-    .preview p {
-        margin: 2px 0;
-        font-size: 14px;
-    }
-    .card input[type="text"],
-    .card input[type="number"],
-    .card textarea,
-    .card select {
-        width: 100%;
-        margin-bottom: 2px;
-        padding: 6px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-        box-sizing: border-box;
-    }
-    textarea {
-        resize: vertical;
-        height: 50px;
-    }
-    .desc-counter {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 8px;
-        text-align: right;
-    }
-    .radio-group {
-        margin: 10px 0 8px;
-        display: flex;
-        justify-content: space-between;
-        gap: 5px;
-    }
-    .radio-group label {
-        flex: 1;
-        font-size: 13px;
-        cursor: pointer;
-        user-select: none;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-    .radio-group input[type="radio"] {
-        margin: 0;
-    }
-    #sendBtn {
-        display: block;
-        margin: 20px auto 0;
-        padding: 12px 25px;
-        font-size: 18px;
-        background: #ffa300;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-    }
-    #sendBtn:hover {
-        background: #ff830b;
-    }
-    .error {
-        border-color: red !important;
-        background-color: #ffe6e6;
-    }
-    .inmueble-num {
-        font-weight: bold;
-        font-size: 16px;
-        margin-bottom: 6px;
-    }
-    #confirmCheckContainer {
-        max-width: 900px;
-        margin: 0 auto 30px auto;
-        font-size: 14px;
-        background: white;
-        padding: 12px 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    #confirmCheckContainer label {
-        user-select: none;
-    }
-    @media (max-width: 900px) {
-        .grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-        form#headerForm {
-            grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
-        }
-        #confirmCheckContainer {
-            padding: 10px;
-        }
-    }
-    @media (max-width: 600px) {
-        .grid {
-            grid-template-columns: 1fr;
-        }
-        form#headerForm {
-            grid-template-columns: 1fr;
-        }
-        #confirmCheckContainer {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 6px;
-        }
-    }
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #dedede;
+    }
+    h1 {
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    #note {
+        text-align: center;
+        font-size: 14px;
+        color: #555;
+        margin-bottom: 25px;
+        font-style: italic;
+    }
+    form#headerForm {
+        background: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        max-width: 900px;
+        margin: 0 auto 30px auto;
+        font-size: 14px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+        gap: 15px 20px;
+        align-items: center;
+    }
+    form#headerForm label {
+        font-weight: 600;
+        display: block;
+        margin-bottom: 4px;
+    }
+    form#headerForm input[type="text"],
+    form#headerForm input[type="email"],
+    form#headerForm input[type="tel"],
+    form#headerForm input[type="file"],
+    form#headerForm input[type="url"] {
+        width: 100%;
+        padding: 6px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+    #logoPreview {
+        max-width: 150px;
+        max-height: 100px;
+        object-fit: contain;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        margin-top: 6px;
+        display: block;
+    }
+    .required::after {
+        content: " *";
+        color: red;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+    .card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        font-size: 14px;
+    }
+    .preview {
+        background: #fafafa;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .preview img {
+        max-width: 100%;
+        height: 160px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    .preview h3 {
+        font-size: 16px;
+        margin: 8px 0 4px;
+    }
+    .preview p {
+        margin: 2px 0;
+        font-size: 14px;
+    }
+    .card input[type="text"],
+    .card input[type="number"],
+    .card textarea,
+    .card select {
+        width: 100%;
+        margin-bottom: 2px;
+        padding: 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+    textarea {
+        resize: vertical;
+        height: 50px;
+    }
+    .desc-counter {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 8px;
+        text-align: right;
+    }
+    .radio-group {
+        margin: 10px 0 8px;
+        display: flex;
+        justify-content: space-between;
+        gap: 5px;
+    }
+    .radio-group label {
+        flex: 1;
+        font-size: 13px;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .radio-group input[type="radio"] {
+        margin: 0;
+    }
+    #sendBtn {
+        display: block;
+        margin: 20px auto 0;
+        padding: 12px 25px;
+        font-size: 18px;
+        background: #ffa300;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    #sendBtn:hover {
+        background: #ff830b;
+    }
+    .error {
+        border-color: red !important;
+        background-color: #ffe6e6;
+    }
+    .inmueble-num {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 6px;
+    }
+    #confirmCheckContainer {
+        max-width: 900px;
+        margin: 0 auto 30px auto;
+        font-size: 14px;
+        background: white;
+        padding: 12px 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    #confirmCheckContainer label {
+        user-select: none;
+    }
+    @media (max-width: 900px) {
+        .grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        form#headerForm {
+            grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+        }
+        #confirmCheckContainer {
+            padding: 10px;
+        }
+    }
+    @media (max-width: 600px) {
+        .grid {
+            grid-template-columns: 1fr;
+        }
+        form#headerForm {
+            grid-template-columns: 1fr;
+        }
+        #confirmCheckContainer {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+    }
 </style>
 </head>
 <body>
@@ -211,277 +519,279 @@
 <div id="note">Nota: Los campos vacíos usarán los datos que se proporcionaron el mes anterior.</div>
 
 <form id="headerForm" novalidate>
-    <div>
-        <label for="nombreInmobiliaria" class="required">Nombre Inmobiliaria</label>
-        <input type="text" id="nombreInmobiliaria" required />
-    </div>
-    <div>
-        <label for="razonSocial" class="required">Razón Social</label>
-        <input type="text" id="razonSocial" required />
-    </div>
-    <div>
-        <label for="cif" class="required">CIF</label>
-        <input type="text" id="cif" required />
-    </div>
-    <div>
-        <label for="email">Email</label>
-        <input type="email" id="email" />
-    </div>
-    <div>
-        <label for="telefono">Teléfono</label>
-        <input type="tel" id="telefono" />
-    </div>
-    <div style="grid-column: 1 / -1;">
-        <label for="direccion">Dirección de la oficina</label>
-        <input type="text" id="direccion" />
-    </div>
-    <div style="grid-column: 1 / -1;">
-        <label for="logo">Cargar Logotipo</label>
-        <input type="file" id="logo" accept="image/*" />
-        <img id="logoPreview" alt="Previsualización logotipo" src="" />
-    </div>
-    <div style="grid-column: 1 / -1;">
-        <label for="eslogan">Eslogan</label>
-        <input type="text" id="eslogan" />
-    </div>
-    <div style="grid-column: 1 / -1;">
-        <label for="paginaWeb">Página Web</label>
-        <input type="url" id="paginaWeb" placeholder="https://www.ejemplo.com" />
-    </div>
+    <div>
+        <label for="nombreInmobiliaria" class="required">Nombre Inmobiliaria</label>
+        <input type="text" id="nombreInmobiliaria" required />
+    </div>
+    <div>
+        <label for="razonSocial" class="required">Razón Social</label>
+        <input type="text" id="razonSocial" required />
+    </div>
+    <div>
+        <label for="cif" class="required">CIF</label>
+        <input type="text" id="cif" required />
+    </div>
+    <div>
+        <label for="email">Email</label>
+        <input type="email" id="email" />
+    </div>
+    <div>
+        <label for="telefono">Teléfono</label>
+        <input type="tel" id="telefono" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="direccion">Dirección de la oficina</label>
+        <input type="text" id="direccion" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="logo">Cargar Logotipo</label>
+        <input type="file" id="logo" accept="image/*" />
+        <img id="logoPreview" alt="Previsualización logotipo" src="" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="eslogan">Eslogan</label>
+        <input type="text" id="eslogan" />
+    </div>
+    <div style="grid-column: 1 / -1;">
+        <label for="paginaWeb">Página Web</label>
+        <input type="url" id="paginaWeb" placeholder="https://www.ejemplo.com" />
+    </div>
 </form>
 
 <div class="grid" id="editor">
-    <!-- Cards generadas por JS -->
+    <!-- Cards generadas por JS -->
 </div>
 <br>
 <div id="confirmCheckContainer">
-    <input type="checkbox" id="confirmCheck" />
-    <label for="confirmCheck">
-        Confirmo que he finalizado la edición y los datos de los inmuebles están correctos, los datos no enviados, se completarán con los datos ya existentes de la edición anterior
-    </label>
+    <input type="checkbox" id="confirmCheck" />
+    <label for="confirmCheck">
+        Confirmo que he finalizado la edición y los datos de los inmuebles están correctos, los datos no enviados, se completarán con los datos ya existentes de la edición anterior
+    </label>
 </div>
 
 <button id="sendBtn">ENVIAR</button>
 
 <script>
-const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwbTJ3DfjPkDxJK5UbFA1hACGfP1Yasc-0dmz2Bislt88dUBCxbAMhPPFSHQ1TGgBk/exec"; // Cambia esto
+const GOOGLE_SHEET_WEBAPP_URL = "PON_AQUI_TU_URL_EXEC"; // Cambia esto
 
 // Previsualización logotipo
 document.getElementById('logo').addEventListener('change', function() {
-    const file = this.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = e => {
-            document.getElementById('logoPreview').src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    } else {
-        document.getElementById('logoPreview').src = "";
-    }
+    const file = this.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('logoPreview').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        document.getElementById('logoPreview').src = "";
+    }
 });
 
 const container = document.getElementById('editor');
 for (let i = 1; i <= 12; i++) {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-        <div class="inmueble-num">Inmueble ${i}</div>
-        <div class="preview" id="preview${i}">
-            <img src="" alt="Vista previa" id="imgPreview${i}">
-            <h3 id="titlePreview${i}">Título</h3>
-            <p id="locPreview${i}">Localidad</p>
-            <p id="descPreview${i}">Descripción</p>
-            <p id="pricePreview${i}">Precio</p>
-            <p id="energyPreview${i}">Etiqueta</p>
-            <p id="saleTypePreview${i}">Tipo de operación</p>
-        </div>
-        <input type="file" accept="image/*" id="img${i}">
-        <input type="text" placeholder="Título" id="title${i}">
-        <input type="text" placeholder="Localidad" id="loc${i}">
-        <textarea maxlength="175" placeholder="Descripción (máx 175 caracteres)" id="desc${i}"></textarea>
-        <div class="desc-counter" id="descCount${i}">0/175</div>
-        <input type="number" placeholder="Precio" id="price${i}">
-        <select id="energy${i}">
-            <option value="">Etiqueta energética</option>
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-            <option value="D">D</option>
-            <option value="E">E</option>
-            <option value="F">F</option>
-            <option value="G">G</option>
-        </select>
-        <div class="radio-group">
-            <label><input type="radio" name="saleType${i}" value="Venta"> Venta</label>
-            <label><input type="radio" name="saleType${i}" value="Alquiler"> Alquiler</label>
-            <label><input type="radio" name="saleType${i}" value="Alquiler con opción a compra"> Alquiler con opción a compra</label>
-        </div>
-    `;
-    container.appendChild(card);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+        <div class="inmueble-num">Inmueble ${i}</div>
+        <div class="preview" id="preview${i}">
+            <img src="" alt="Vista previa" id="imgPreview${i}">
+            <h3 id="titlePreview${i}">Título</h3>
+            <p id="locPreview${i}">Localidad</p>
+            <p id="descPreview${i}">Descripción</p>
+            <p id="pricePreview${i}">Precio</p>
+            <p id="energyPreview${i}">Etiqueta</p>
+            <p id="saleTypePreview${i}">Tipo de operación</p>
+        </div>
+        <input type="file" accept="image/*" id="img${i}">
+        <input type="text" placeholder="Título" id="title${i}">
+        <input type="text" placeholder="Localidad" id="loc${i}">
+        <textarea maxlength="175" placeholder="Descripción (máx 175 caracteres)" id="desc${i}"></textarea>
+        <div class="desc-counter" id="descCount${i}">0/175</div>
+        <input type="number" placeholder="Precio" id="price${i}">
+        <select id="energy${i}">
+            <option value="">Etiqueta energética</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+            <option value="G">G</option>
+        </select>
+        <div class="radio-group">
+            <label><input type="radio" name="saleType${i}" value="Venta"> Venta</label>
+            <label><input type="radio" name="saleType${i}" value="Alquiler"> Alquiler</label>
+            <label><input type="radio" name="saleType${i}" value="Alquiler con opción a compra"> Alquiler con opción a compra</label>
+        </div>
+    `;
+    container.appendChild(card);
 
-    // Actualizar contador caracteres descripción
-    const descTextarea = card.querySelector(`#desc${i}`);
-    const descCounter = card.querySelector(`#descCount${i}`);
-    descTextarea.addEventListener('input', () => {
-        descCounter.textContent = `${descTextarea.value.length}/175`;
-        updatePreview(i);
-    });
+    // Actualizar contador caracteres descripción
+    const descTextarea = card.querySelector(`#desc${i}`);
+    const descCounter = card.querySelector(`#descCount${i}`);
+    descTextarea.addEventListener('input', () => {
+        descCounter.textContent = `${descTextarea.value.length}/175`;
+        updatePreview(i);
+    });
 
-    // Actualizar preview para otros inputs
-    ['title', 'loc', 'price', 'energy'].forEach(field => {
-        card.querySelector(`#${field}${i}`).addEventListener('input', () => updatePreview(i));
-    });
-    // Radio buttons
-    card.querySelectorAll(`input[name="saleType${i}"]`).forEach(radio => {
-        radio.addEventListener('change', () => updatePreview(i));
-    });
-    // Imagen preview
-    card.querySelector(`#img${i}`).addEventListener('change', function () {
-        const file = this.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                document.getElementById(`imgPreview${i}`).src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        } else {
-            document.getElementById(`imgPreview${i}`).src = "";
-        }
-    });
+    // Actualizar preview para otros inputs
+    ['title', 'loc', 'price', 'energy'].forEach(field => {
+        card.querySelector(`#${field}${i}`).addEventListener('input', () => updatePreview(i));
+    });
+    // Radio buttons
+    card.querySelectorAll(`input[name="saleType${i}"]`).forEach(radio => {
+        radio.addEventListener('change', () => updatePreview(i));
+    });
+    // Imagen preview
+    card.querySelector(`#img${i}`).addEventListener('change', function () {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById(`imgPreview${i}`).src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            document.getElementById(`imgPreview${i}`).src = "";
+        }
+    });
 }
 
 // Función para actualizar la vista previa del inmueble i
 function updatePreview(i) {
-    const title = document.getElementById(`title${i}`).value.trim();
-    const loc = document.getElementById(`loc${i}`).value.trim();
-    const desc = document.getElementById(`desc${i}`).value.trim();
-    const price = document.getElementById(`price${i}`).value.trim();
-    const energy = document.getElementById(`energy${i}`).value;
-    const saleTypeElems = document.getElementsByName(`saleType${i}`);
-    let saleType = "";
-    for (const radio of saleTypeElems) {
-        if (radio.checked) {
-            saleType = radio.value;
-            break;
-        }
-    }
+    const title = document.getElementById(`title${i}`).value.trim();
+    const loc = document.getElementById(`loc${i}`).value.trim();
+    const desc = document.getElementById(`desc${i}`).value.trim();
+    const price = document.getElementById(`price${i}`).value.trim();
+    const energy = document.getElementById(`energy${i}`).value;
+    const saleTypeElems = document.getElementsByName(`saleType${i}`);
+    let saleType = "";
+    for (const radio of saleTypeElems) {
+        if (radio.checked) {
+            saleType = radio.value;
+            break;
+        }
+    }
 
-    document.getElementById(`titlePreview${i}`).textContent = title || "Título";
-    document.getElementById(`locPreview${i}`).textContent = loc || "Localidad";
-    document.getElementById(`descPreview${i}`).textContent = desc || "Descripción";
-    document.getElementById(`pricePreview${i}`).textContent = price ? price + " €" : "Precio";
-    document.getElementById(`energyPreview${i}`).textContent = energy ? "Etiqueta: " + energy : "Etiqueta energética";
-    document.getElementById(`saleTypePreview${i}`).textContent = saleType || "Tipo de operación";
+    document.getElementById(`titlePreview${i}`).textContent = title || "Título";
+    document.getElementById(`locPreview${i}`).textContent = loc || "Localidad";
+    document.getElementById(`descPreview${i}`).textContent = desc || "Descripción";
+    document.getElementById(`pricePreview${i}`).textContent = price ? price + " €" : "Precio";
+    document.getElementById(`energyPreview${i}`).textContent = energy ? "Etiqueta: " + energy : "Etiqueta energética";
+    document.getElementById(`saleTypePreview${i}`).textContent = saleType || "Tipo de operación";
 }
 
 // Botón enviar y validación
 document.getElementById('sendBtn').addEventListener('click', async () => {
-    // Validación del checkbox obligatorio
-    const confirmCheck = document.getElementById('confirmCheck');
-    if (!confirmCheck.checked) {
-        alert("Debes confirmar que has finalizado la edición y que los datos son correctos.");
-        return;
-    }
+    // Validación del checkbox obligatorio
+    const confirmCheck = document.getElementById('confirmCheck');
+    if (!confirmCheck.checked) {
+        alert("Debes confirmar que has finalizado la edición y que los datos son correctos.");
+        return;
+    }
 
-    // Validar campos obligatorios header
-    const nombreInmobiliaria = document.getElementById('nombreInmobiliaria');
-    const razonSocial = document.getElementById('razonSocial');
-    const cif = document.getElementById('cif');
+    // Validar campos obligatorios header
+    const nombreInmobiliaria = document.getElementById('nombreInmobiliaria');
+    const razonSocial = document.getElementById('razonSocial');
+    const cif = document.getElementById('cif');
 
-    let valid = true;
-    [nombreInmobiliaria, razonSocial, cif].forEach(input => {
-        if (!input.value.trim()) {
-            input.classList.add('error');
-            valid = false;
-        } else {
-            input.classList.remove('error');
-        }
-    });
-    if (!valid) {
-        alert("Por favor, completa los campos obligatorios marcados.");
-        return;
-    }
+    let valid = true;
+    [nombreInmobiliaria, razonSocial, cif].forEach(input => {
+        if (!input.value.trim()) {
+            input.classList.add('error');
+            valid = false;
+        } else {
+            input.classList.remove('error');
+        }
+    });
+    if (!valid) {
+        alert("Por favor, completa los campos obligatorios marcados.");
+        return;
+    }
 
-    // Preparar datos para enviar
-    const formData = {
-        header: {
-            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
-            razonSocial: razonSocial.value.trim(),
-            cif: cif.value.trim(),
-            email: document.getElementById('email').value.trim(),
-            telefono: document.getElementById('telefono').value.trim(),
-            direccion: document.getElementById('direccion').value.trim(),
-            eslogan: document.getElementById('eslogan').value.trim(),
-            paginaWeb: document.getElementById('paginaWeb').value.trim()
-        },
-        inmuebles: []
-    };
+    // Preparar datos para enviar
+    const formData = {
+        header: {
+            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
+            razonSocial: razonSocial.value.trim(),
+            cif: cif.value.trim(),
+            email: document.getElementById('email').value.trim(),
+            telefono: document.getElementById('telefono').value.trim(),
+            direccion: document.getElementById('direccion').value.trim(),
+            eslogan: document.getElementById('eslogan').value.trim(),
+            paginaWeb: document.getElementById('paginaWeb').value.trim()
+        },
+        inmuebles: []
+    };
 
-    // Recoger datos de inmuebles
-    for (let i = 1; i <= 12; i++) {
-        const title = document.getElementById(`title${i}`).value.trim();
-        const loc = document.getElementById(`loc${i}`).value.trim();
-        const desc = document.getElementById(`desc${i}`).value.trim();
-        const price = document.getElementById(`price${i}`).value.trim();
-        const energy = document.getElementById(`energy${i}`).value;
-        const saleTypeElems = document.getElementsByName(`saleType${i}`);
-        let saleType = "";
-        for (const radio of saleTypeElems) {
-            if (radio.checked) {
-                saleType = radio.value;
-                break;
-            }
-        }
-        formData.inmuebles.push({
-            title,
-            loc,
-            desc,
-            price,
-            energy,
-            saleType
-        });
-    }
+    // Recoger datos de inmuebles
+    for (let i = 1; i <= 12; i++) {
+        const title = document.getElementById(`title${i}`).value.trim();
+        const loc = document.getElementById(`loc${i}`).value.trim();
+        const desc = document.getElementById(`desc${i}`).value.trim();
+        const price = document.getElementById(`price${i}`).value.trim();
+        const energy = document.getElementById(`energy${i}`).value;
+        const saleTypeElems = document.getElementsByName(`saleType${i}`);
+        let saleType = "";
+        for (const radio of saleTypeElems) {
+            if (radio.checked) {
+                saleType = radio.value;
+                break;
+            }
+        }
+        formData.inmuebles.push({
+            title,
+            loc,
+            desc,
+            price,
+            energy,
+            saleType
+        });
+    }
 
-    // Crear FormData para enviar archivos
-    const filesFormData = new FormData();
-    
-    // Agregar logo si existe
-    const logoInput = document.getElementById('logo');
-    if (logoInput.files.length > 0) {
-        filesFormData.append('logo', logoInput.files[0]);
-    }
-    
-    // Agregar imágenes de inmuebles
-    for (let i = 1; i <= 12; i++) {
-        const imgInput = document.getElementById(`img${i}`);
-        if (imgInput.files.length > 0) {
-            filesFormData.append(`img${i}`, imgInput.files[0]);
-        }
-    }
-    
-    // Agregar datos JSON como string
-    filesFormData.append('data', JSON.stringify(formData));
+    // Crear FormData para enviar archivos
+    const filesFormData = new FormData();
+    
+    // Agregar logo si existe
+    const logoInput = document.getElementById('logo');
+    if (logoInput.files.length > 0) {
+        filesFormData.append('logo', logoInput.files[0]);
+    }
+    
+    // Agregar imágenes de inmuebles
+    for (let i = 1; i <= 12; i++) {
+        const imgInput = document.getElementById(`img${i}`);
+        if (imgInput.files.length > 0) {
+            filesFormData.append(`img${i}`, imgInput.files[0]);
+        }
+    }
+    
+    // Agregar datos JSON como string
+    filesFormData.append('data', JSON.stringify(formData));
 
-    // Enviar datos por fetch
-    try {
-        const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
-            method: "POST",
-            body: filesFormData
-            // No establecer Content-Type (se establece automáticamente con FormData)
-        });
-        
-        const result = await response.json();
-        if (result.success) {
-            alert("Datos enviados correctamente.");
-            // Opcional: resetear formulario o recargar página
-        } else {
-            alert("Error al enviar los datos: " + (result.message || "Error desconocido"));
-        }
-    } catch (error) {
-        alert("Error en la conexión: " + error.message);
-    }
+    // Enviar datos por fetch
+    try {
+        const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+            method: "POST",
+            body: filesFormData
+            // No establecer Content-Type (se establece automáticamente con FormData)
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            alert("Datos enviados correctamente.");
+            // Opcional: resetear formulario o recargar página
+        } else {
+            alert("Error al enviar los datos: " + (result.message || "Error desconocido"));
+        }
+    } catch (error) {
+        alert("Error en la conexión: " + error.message);
+    }
 });
 </script>
 
 </body>
 </html>
+index2.html
+Displaying index2.html. 
