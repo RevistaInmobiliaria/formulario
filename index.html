@@ -457,36 +457,21 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     }
 
     // Preparar datos para enviar
-    // Preparar datos para enviar
     const formData = {
-  header: {
-    cif: "A12345678",
-    nombreInmobiliaria: "Inmo Ejemplo",
-    razonSocial: "Ejemplo S.A.",
-    email: "contacto@inmo.com",
-    // ... otros campos que quieras enviar
-  },
-  inmuebles: [
-    {
-      imgBase64: "",
-      title: "Piso céntrico",
-      loc: "Madrid",
-      desc: "Bonito piso en el centro",
-      price: "200000",
-      energy: "B",
-      saleType: "Venta"
-    }
-    // ... más inmuebles
-  ]
-};
-
-// luego haces el fetch con JSON.stringify(formData)
-
-
-    // AÑADIR LOS COLORES CORPORATIVOS A LA CABECERA
-    formData.header.color1 = document.getElementById('color1').value;
-    formData.header.color2 = document.getElementById('color2').value;
-
+        header: {
+            cif: nombreInmobiliaria.value.trim(),
+            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
+            razonSocial: razonSocial.value.trim(),
+            email: document.getElementById('email').value.trim(),
+            telefono: document.getElementById('telefono').value.trim(),
+            direccion: document.getElementById('direccion').value.trim(),
+            eslogan: document.getElementById('eslogan').value.trim(),
+            paginaWeb: document.getElementById('paginaWeb').value.trim(),
+            color1: document.getElementById('color1').value,
+            color2: document.getElementById('color2').value
+        },
+        inmuebles: []
+    };
 
     // Convertir logo a base64 si hay archivo
     const logoInput = document.getElementById('logo');
@@ -497,7 +482,7 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     // Recoger datos de inmuebles
     for (let i = 1; i <= 12; i++) {
         const imgInput = document.getElementById(`img${i}`);
-        let imgBase64 = null;
+        let imgBase64 = "";
         if (imgInput.files.length > 0) {
             imgBase64 = await toBase64(imgInput.files[0]);
         }
@@ -507,8 +492,6 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
         const price = document.getElementById(`price${i}`).value.trim();
         const energy = document.getElementById(`energy${i}`).value;
         const saleTypeElems = document.getElementsByName(`saleType${i}`);
-        const color1 = document.getElementById('color1').value;
-        const color2 = document.getElementById('color2').value;
         let saleType = "";
         for (const radio of saleTypeElems) {
             if (radio.checked) {
@@ -548,6 +531,5 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     }
 });
 </script>
-
 </body>
 </html>
