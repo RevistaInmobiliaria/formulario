@@ -355,6 +355,7 @@ function debugFormData(formData) {
     console.log("Header:", formData.header);
     console.log("Inmuebles:", formData.inmuebles);
     console.log("CIF recibido:", formData.header ? formData.header.cif : "NO DEFINIDO");
+    console.log("JSON completo:", JSON.stringify(formData));
     return formData;
 }
 
