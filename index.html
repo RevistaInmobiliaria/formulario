@@ -459,19 +459,29 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     // Preparar datos para enviar
     // Preparar datos para enviar
     const formData = {
-        header: {
-            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
-            razonSocial: razonSocial.value.trim(),
-            cif: cif.value.trim(),
-            email: document.getElementById('email').value.trim(),
-            telefono: document.getElementById('telefono').value.trim(),
-            direccion: document.getElementById('direccion').value.trim(),
-            eslogan: document.getElementById('eslogan').value.trim(),
-            paginaWeb: document.getElementById('paginaWeb').value.trim(),
-            logoBase64: null,
-        },
-        inmuebles: []
-    };
+  header: {
+    cif: "A12345678",
+    nombreInmobiliaria: "Inmo Ejemplo",
+    razonSocial: "Ejemplo S.A.",
+    email: "contacto@inmo.com",
+    // ... otros campos que quieras enviar
+  },
+  inmuebles: [
+    {
+      imgBase64: "",
+      title: "Piso céntrico",
+      loc: "Madrid",
+      desc: "Bonito piso en el centro",
+      price: "200000",
+      energy: "B",
+      saleType: "Venta"
+    }
+    // ... más inmuebles
+  ]
+};
+
+// luego haces el fetch con JSON.stringify(formData)
+
 
     // AÑADIR LOS COLORES CORPORATIVOS A LA CABECERA
     formData.header.color1 = document.getElementById('color1').value;
