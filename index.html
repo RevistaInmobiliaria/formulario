@@ -266,7 +266,7 @@
 <script>
 const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwbTJ3DfjPkDxJK5UbFA1hACGfP1Yasc-0dmz2Bislt88dUBCxbAMhPPFSHQ1TGgBk/exec";
 
-// Previsualización logotipo
+// Previsualización logo (igual que antes)
 document.getElementById('logo').addEventListener('change', function() {
     const file = this.files[0];
     if (file) {
@@ -350,7 +350,112 @@ for (let i = 1; i <= 12; i++) {
         }
     });
 }
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        if (!file) resolve(""); // si no hay archivo, devolvemos cadena vacía
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+}
 
+document.getElementById('sendBtn').addEventListener('click', async () => {
+    // Validar checkbox y campos obligatorios (igual que antes)
+    const confirmCheck = document.getElementById('confirmCheck');
+    if (!confirmCheck.checked) {
+        alert("Debes confirmar que has finalizado la edición y que los datos son correctos.");
+        return;
+    }
+
+    const nombreInmobiliaria = document.getElementById('nombreInmobiliaria');
+    const razonSocial = document.getElementById('razonSocial');
+    const cif = document.getElementById('cif');
+
+    let valid = true;
+    [nombreInmobiliaria, razonSocial, cif].forEach(input => {
+        if (!input.value.trim()) {
+            input.classList.add('error');
+            valid = false;
+        } else {
+            input.classList.remove('error');
+        }
+    });
+    if (!valid) {
+        alert("Por favor, completa los campos obligatorios marcados.");
+        return;
+    }
+
+    // Armar objeto con datos header
+    const formData = {
+        header: {
+            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
+            razonSocial: razonSocial.value.trim(),
+            cif: cif.value.trim(),
+            email: document.getElementById('email').value.trim(),
+            telefono: document.getElementById('telefono').value.trim(),
+            direccion: document.getElementById('direccion').value.trim(),
+            eslogan: document.getElementById('eslogan').value.trim(),
+            paginaWeb: document.getElementById('paginaWeb').value.trim(),
+            logoBase64: "" // lo rellenaremos luego
+        },
+        inmuebles: []
+    };
+
+    // Leer logo en base64 si hay archivo
+    const logoFile = document.getElementById('logo').files[0];
+    formData.header.logoBase64 = logoFile ? await fileToBase64(logoFile) : "";
+
+    // Recoger datos de inmuebles y leer imágenes base64
+    for (let i = 1; i <= 12; i++) {
+        const title = document.getElementById(`title${i}`).value.trim();
+        const loc = document.getElementById(`loc${i}`).value.trim();
+        const desc = document.getElementById(`desc${i}`).value.trim();
+        const price = document.getElementById(`price${i}`).value.trim();
+        const energy = document.getElementById(`energy${i}`).value;
+        const saleTypeElems = document.getElementsByName(`saleType${i}`);
+        let saleType = "";
+        for (const radio of saleTypeElems) {
+            if (radio.checked) {
+                saleType = radio.value;
+                break;
+            }
+        }
+        // Leer imagen base64 para inmueble i
+        const imgFile = document.getElementById(`img${i}`).files[0];
+        const imgBase64 = imgFile ? await fileToBase64(imgFile) : "";
+
+        formData.inmuebles.push({
+            imgBase64,
+            title,
+            loc,
+            desc,
+            price,
+            energy,
+            saleType
+        });
+    }
+
+    // Enviar solo JSON (con header logo e inmuebles con imgBase64)
+    try {
+        const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            alert("Datos enviados correctamente.");
+        } else {
+            alert("Error al enviar los datos: " + (result.message || "Error desconocido"));
+        }
+    } catch (error) {
+        alert("Error en la conexión: " + error.message);
+    }
+});
 // Función para actualizar la vista previa del inmueble i
 function updatePreview(i) {
     const title = document.getElementById(`title${i}`).value.trim();
