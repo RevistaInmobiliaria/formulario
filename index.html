@@ -266,7 +266,7 @@
 <script>
 const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwbTJ3DfjPkDxJK5UbFA1hACGfP1Yasc-0dmz2Bislt88dUBCxbAMhPPFSHQ1TGgBk/exec";
 
-// Previsualización logo (igual que antes)
+// Previsualización logotipo
 document.getElementById('logo').addEventListener('change', function() {
     const file = this.files[0];
     if (file) {
@@ -284,7 +284,7 @@ const container = document.getElementById('editor');
 for (let i = 1; i <= 12; i++) {
     const card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = `
+    card.innerHTML = 
         <div class="inmueble-num">Inmueble ${i}</div>
         <div class="preview" id="preview${i}">
             <img src="" alt="Vista previa" id="imgPreview${i}">
@@ -317,153 +317,48 @@ for (let i = 1; i <= 12; i++) {
             <label><input type="radio" name="saleType${i}" value="Alquiler"> Alquiler</label>
             <label><input type="radio" name="saleType${i}" value="Alquiler con opción a compra"> Alquiler con opción a compra</label>
         </div>
-    `;
+    ;
     container.appendChild(card);
 
     // Actualizar contador caracteres descripción
-    const descTextarea = card.querySelector(`#desc${i}`);
-    const descCounter = card.querySelector(`#descCount${i}`);
+    const descTextarea = card.querySelector(#desc${i});
+    const descCounter = card.querySelector(#descCount${i});
     descTextarea.addEventListener('input', () => {
-        descCounter.textContent = `${descTextarea.value.length}/175`;
+        descCounter.textContent = ${descTextarea.value.length}/175;
         updatePreview(i);
     });
 
     // Actualizar preview para otros inputs
     ['title', 'loc', 'price', 'energy'].forEach(field => {
-        card.querySelector(`#${field}${i}`).addEventListener('input', () => updatePreview(i));
+        card.querySelector(#${field}${i}).addEventListener('input', () => updatePreview(i));
     });
     // Radio buttons
-    card.querySelectorAll(`input[name="saleType${i}"]`).forEach(radio => {
+    card.querySelectorAll(input[name="saleType${i}"]).forEach(radio => {
         radio.addEventListener('change', () => updatePreview(i));
     });
     // Imagen preview
-    card.querySelector(`#img${i}`).addEventListener('change', function () {
+    card.querySelector(#img${i}).addEventListener('change', function () {
         const file = this.files[0];
         if (file) {
             const reader = new FileReader();
             reader.onload = e => {
-                document.getElementById(`imgPreview${i}`).src = e.target.result;
+                document.getElementById(imgPreview${i}).src = e.target.result;
             };
             reader.readAsDataURL(file);
         } else {
-            document.getElementById(`imgPreview${i}`).src = "";
+            document.getElementById(imgPreview${i}).src = "";
         }
     });
 }
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        if (!file) resolve(""); // si no hay archivo, devolvemos cadena vacía
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-}
 
-document.getElementById('sendBtn').addEventListener('click', async () => {
-    // Validar checkbox y campos obligatorios (igual que antes)
-    const confirmCheck = document.getElementById('confirmCheck');
-    if (!confirmCheck.checked) {
-        alert("Debes confirmar que has finalizado la edición y que los datos son correctos.");
-        return;
-    }
-
-    const nombreInmobiliaria = document.getElementById('nombreInmobiliaria');
-    const razonSocial = document.getElementById('razonSocial');
-    const cif = document.getElementById('cif');
-
-    let valid = true;
-    [nombreInmobiliaria, razonSocial, cif].forEach(input => {
-        if (!input.value.trim()) {
-            input.classList.add('error');
-            valid = false;
-        } else {
-            input.classList.remove('error');
-        }
-    });
-    if (!valid) {
-        alert("Por favor, completa los campos obligatorios marcados.");
-        return;
-    }
-
-    // Armar objeto con datos header
-    const formData = {
-        header: {
-            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
-            razonSocial: razonSocial.value.trim(),
-            cif: cif.value.trim(),
-            email: document.getElementById('email').value.trim(),
-            telefono: document.getElementById('telefono').value.trim(),
-            direccion: document.getElementById('direccion').value.trim(),
-            eslogan: document.getElementById('eslogan').value.trim(),
-            paginaWeb: document.getElementById('paginaWeb').value.trim(),
-            logoBase64: "" // lo rellenaremos luego
-        },
-        inmuebles: []
-    };
-
-    // Leer logo en base64 si hay archivo
-    const logoFile = document.getElementById('logo').files[0];
-    formData.header.logoBase64 = logoFile ? await fileToBase64(logoFile) : "";
-
-    // Recoger datos de inmuebles y leer imágenes base64
-    for (let i = 1; i <= 12; i++) {
-        const title = document.getElementById(`title${i}`).value.trim();
-        const loc = document.getElementById(`loc${i}`).value.trim();
-        const desc = document.getElementById(`desc${i}`).value.trim();
-        const price = document.getElementById(`price${i}`).value.trim();
-        const energy = document.getElementById(`energy${i}`).value;
-        const saleTypeElems = document.getElementsByName(`saleType${i}`);
-        let saleType = "";
-        for (const radio of saleTypeElems) {
-            if (radio.checked) {
-                saleType = radio.value;
-                break;
-            }
-        }
-        // Leer imagen base64 para inmueble i
-        const imgFile = document.getElementById(`img${i}`).files[0];
-        const imgBase64 = imgFile ? await fileToBase64(imgFile) : "";
-
-        formData.inmuebles.push({
-            imgBase64,
-            title,
-            loc,
-            desc,
-            price,
-            energy,
-            saleType
-        });
-    }
-
-    // Enviar solo JSON (con header logo e inmuebles con imgBase64)
-    try {
-        const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const result = await response.json();
-        if (result.success) {
-            alert("Datos enviados correctamente.");
-        } else {
-            alert("Error al enviar los datos: " + (result.message || "Error desconocido"));
-        }
-    } catch (error) {
-        alert("Error en la conexión: " + error.message);
-    }
-});
 // Función para actualizar la vista previa del inmueble i
 function updatePreview(i) {
-    const title = document.getElementById(`title${i}`).value.trim();
-    const loc = document.getElementById(`loc${i}`).value.trim();
-    const desc = document.getElementById(`desc${i}`).value.trim();
-    const price = document.getElementById(`price${i}`).value.trim();
-    const energy = document.getElementById(`energy${i}`).value;
-    const saleTypeElems = document.getElementsByName(`saleType${i}`);
+    const title = document.getElementById(title${i}).value.trim();
+    const loc = document.getElementById(loc${i}).value.trim();
+    const desc = document.getElementById(desc${i}).value.trim();
+    const price = document.getElementById(price${i}).value.trim();
+    const energy = document.getElementById(energy${i}).value;
+    const saleTypeElems = document.getElementsByName(saleType${i});
     let saleType = "";
     for (const radio of saleTypeElems) {
         if (radio.checked) {
@@ -472,12 +367,12 @@ function updatePreview(i) {
         }
     }
 
-    document.getElementById(`titlePreview${i}`).textContent = title || "Título";
-    document.getElementById(`locPreview${i}`).textContent = loc || "Localidad";
-    document.getElementById(`descPreview${i}`).textContent = desc || "Descripción";
-    document.getElementById(`pricePreview${i}`).textContent = price ? price + " €" : "Precio";
-    document.getElementById(`energyPreview${i}`).textContent = energy ? "Etiqueta: " + energy : "Etiqueta energética";
-    document.getElementById(`saleTypePreview${i}`).textContent = saleType || "Tipo de operación";
+    document.getElementById(titlePreview${i}).textContent = title || "Título";
+    document.getElementById(locPreview${i}).textContent = loc || "Localidad";
+    document.getElementById(descPreview${i}).textContent = desc || "Descripción";
+    document.getElementById(pricePreview${i}).textContent = price ? price + " €" : "Precio";
+    document.getElementById(energyPreview${i}).textContent = energy ? "Etiqueta: " + energy : "Etiqueta energética";
+    document.getElementById(saleTypePreview${i}).textContent = saleType || "Tipo de operación";
 }
 
 // Botón enviar y validación
@@ -525,12 +420,12 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
 
     // Recoger datos de inmuebles
     for (let i = 1; i <= 12; i++) {
-        const title = document.getElementById(`title${i}`).value.trim();
-        const loc = document.getElementById(`loc${i}`).value.trim();
-        const desc = document.getElementById(`desc${i}`).value.trim();
-        const price = document.getElementById(`price${i}`).value.trim();
-        const energy = document.getElementById(`energy${i}`).value;
-        const saleTypeElems = document.getElementsByName(`saleType${i}`);
+        const title = document.getElementById(title${i}).value.trim();
+        const loc = document.getElementById(loc${i}).value.trim();
+        const desc = document.getElementById(desc${i}).value.trim();
+        const price = document.getElementById(price${i}).value.trim();
+        const energy = document.getElementById(energy${i}).value;
+        const saleTypeElems = document.getElementsByName(saleType${i});
         let saleType = "";
         for (const radio of saleTypeElems) {
             if (radio.checked) {
@@ -559,9 +454,9 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     
     // Agregar imágenes de inmuebles
     for (let i = 1; i <= 12; i++) {
-        const imgInput = document.getElementById(`img${i}`);
+        const imgInput = document.getElementById(img${i});
         if (imgInput.files.length > 0) {
-            filesFormData.append(`img${i}`, imgInput.files[0]);
+            filesFormData.append(img${i}, imgInput.files[0]);
         }
     }
     
