@@ -456,22 +456,29 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
         return;
     }
 
+    // VALIDAR CIF QUE NO SEA "cif" (en minúsculas)
+    if (cif.value.trim().toLowerCase() === "cif") {
+        alert("Por favor, ingresa un CIF válido diferente de 'cif'.");
+        cif.classList.add('error');
+        return;
+    }
+
     // Preparar datos para enviar
-        const formData = {
-          header: {
-            cif: cif.value.trim(),
-            nombreInmobiliaria: nombreInmobiliaria.value.trim(),
-            razonSocial: razonSocial.value.trim(),
-            email: document.getElementById('email').value.trim(),
-            telefono: document.getElementById('telefono').value.trim(),
-            direccion: document.getElementById('direccion').value.trim(),
-            eslogan: document.getElementById('eslogan').value.trim(),
-            paginaWeb: document.getElementById('paginaWeb').value.trim(),
-            color1: document.getElementById('color1').value,
-            color2: document.getElementById('color2').value
-          },
-          inmuebles: []
-        };
+    const formData = {
+      header: {
+        cif: cif.value.trim(),
+        nombreInmobiliaria: nombreInmobiliaria.value.trim(),
+        razonSocial: razonSocial.value.trim(),
+        email: document.getElementById('email').value.trim(),
+        telefono: document.getElementById('telefono').value.trim(),
+        direccion: document.getElementById('direccion').value.trim(),
+        eslogan: document.getElementById('eslogan').value.trim(),
+        paginaWeb: document.getElementById('paginaWeb').value.trim(),
+        color1: document.getElementById('color1').value,
+        color2: document.getElementById('color2').value
+      },
+      inmuebles: []
+    };
 
     // Convertir logo a base64 si hay archivo
     const logoInput = document.getElementById('logo');
@@ -531,5 +538,6 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
     }
 });
 </script>
+
 </body>
 </html>
